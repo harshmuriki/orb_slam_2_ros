@@ -67,7 +67,7 @@ void Node::PublishRenderedImage (cv::Mat image) {
 }
 
 
-tf::Transform Node::TransformFromMat (cv::Mat position_mat) {
+/**tf::Transform Node::TransformFromMat (cv::Mat position_mat) {
   cv::Mat rotation(3,3,CV_32F);
   cv::Mat translation(3,1,CV_32F);
 
@@ -106,8 +106,41 @@ tf::Transform Node::TransformFromMat (cv::Mat position_mat) {
   tf_camera_translation = invX*tf_camera_translation;
 
   return tf::Transform (tf_camera_rotation, tf_camera_translation);
-}
+} **/
 
+tf::Transform Node::TransformFromMat (cv::Mat position_mat) {
+  cv::Mat rotation(3,3,CV_32F);
+  cv::Mat translation(3,1,CV_32F);
+
+  rotation = position_mat.rowRange(0,3).colRange(0,3);
+  translation = position_mat.rowRange(0,3).col(3);
+
+  tf::Matrix3x3 tf_camera_rotation (rotation.at<float> (0,0), rotation.at<float> (0,1), rotation.at<float> (0,2),
+                                    rotation.at<float> (1,0), rotation.at<float> (1,1), rotation.at<float> (1,2),
+                                    rotation.at<float> (2,0), rotation.at<float> (2,1), rotation.at<float> (2,2)
+                                   );
+
+  tf::Vector3 tf_camera_translation (translation.at<float> (0), translation.at<float> (1), translation.at<float> (2));
+
+  //Coordinate transformation matrix : same as invYZ * Rz * Rx
+  const tf::Matrix3x3 matTrans (0, 0, 1,
+                               -1, 0, 0,
+                                0,-1, 0);
+                                
+  //Convert from orb_slam coordinates system to ros coordinates system
+  tf_camera_rotation = matTrans*tf_camera_rotation;
+  tf_camera_translation = matTrans*tf_camera_translation;
+
+  //Inverse matrix
+  tf_camera_rotation = tf_camera_rotation.transpose();
+  tf_camera_translation = -(tf_camera_rotation*tf_camera_translation);
+
+  //Convert from orb_slam coordinates system to ros coordinates system
+  tf_camera_rotation = matTrans*tf_camera_rotation;
+  tf_camera_translation = matTrans*tf_camera_translation;
+
+  return tf::Transform (tf_camera_rotation, tf_camera_translation);
+}
 
 sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::MapPoint*> map_points) {
   if (map_points.size() == 0) {
