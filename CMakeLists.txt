@@ -25,6 +25,9 @@ image_transport
 tf
 sensor_msgs
 dynamic_reconfigure
+eigen_conversions
+geometry_msgs
+tf_conversions
 )
 
 find_package(OpenCV 3.0 QUIET)

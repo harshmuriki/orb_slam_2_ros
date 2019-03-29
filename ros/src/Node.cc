@@ -1,5 +1,5 @@
 #include "Node.h"
-
+#include <opencv2/core/eigen.hpp>
 #include <iostream>
 
 Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport) {
@@ -11,7 +11,7 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
   //static parameters
   node_handle_.param(name_of_node_+"/publish_pointcloud", publish_pointcloud_param_, true);
   node_handle_.param<std::string>(name_of_node_+"/pointcloud_frame_id", map_frame_id_param_, "map");
-  node_handle_.param<std::string>(name_of_node_+"/camera_frame_id", camera_frame_id_param_, "camera_link");
+  node_handle_.param<std::string>(name_of_node_+"/camera_frame_id", camera_frame_id_param_, "odom");
 
   //Setup dynamic reconfigure
   dynamic_reconfigure::Server<orb_slam2_ros::dynamic_reconfigureConfig>::CallbackType dynamic_param_callback;
@@ -68,10 +68,105 @@ void Node::PublishRenderedImage (cv::Mat image) {
 }
 
 
-/**tf::Transform Node::TransformFromMat (cv::Mat position_mat) {
+tf::Transform Node::TransformFromMat (cv::Mat position_mat) {
+
   cv::Mat rotation(3,3,CV_32F);
   cv::Mat translation(3,1,CV_32F);
+  rotation = position_mat.rowRange(0,3).colRange(0,3);
+  translation = position_mat.rowRange(0,3).col(3);
 
+  tf::Matrix3x3 tf_camera_rotation (rotation.at<float> (0,0), rotation.at<float> (0,1), rotation.at<float> (0,2),
+                                    rotation.at<float> (1,0), rotation.at<float> (1,1), rotation.at<float> (1,2),
+                                    rotation.at<float> (2,0), rotation.at<float> (2,1), rotation.at<float> (2,2)
+                                   );
+
+  tf::Vector3 tf_camera_translation (translation.at<float> (0), translation.at<float> (1), translation.at<float> (2));
+
+  //Coordinate transformation matrix from orb coordinate system to ros coordinate system
+  const tf::Matrix3x3 tf_orb_to_ros (0, 0, 1,
+                                    -1, 0, 0,
+                                     0,-1, 0);
+
+  tf_camera_rotation = tf_orb_to_ros*tf_camera_rotation;
+  tf_camera_translation = tf_orb_to_ros*tf_camera_translation;
+
+  //Inverse matrix
+  tf_camera_rotation = tf_camera_rotation.transpose();
+  tf_camera_translation = -(tf_camera_rotation*tf_camera_translation);
+
+  //Transform from orb coordinate system to ros coordinate system on map coordinates
+  tf_camera_rotation = tf_orb_to_ros*tf_camera_rotation;
+  tf_camera_translation = tf_orb_to_ros*tf_camera_translation;
+  
+  tf::Transform transform_to_ros_coordinates = tf::Transform (tf_camera_rotation, tf_camera_translation);
+
+  // Checking
+  tf::TransformListener tflistener;
+  tf::StampedTransform transformStamped;
+
+  // std::cout << "hit" << "\n" ;
+  
+  try {
+    ros::Time now = ros::Time(0);
+    tflistener.waitForTransform("head_camera_link", camera_frame_id_param_, now, ros::Duration(1.0));
+    //now = ros::Time::now();
+    tflistener.lookupTransform("head_camera_link", camera_frame_id_param_, now, transformStamped); // camera_frame_id_param_, ros::Time(0), transformStamped);
+  }
+  catch (tf::TransformException ex){
+    ROS_ERROR("%s",ex.what());
+    //ros::Duration(0.1).sleep();
+  }
+  
+  tf::Transform transform_to_camera;
+  //tf::Matrix3x3 rotation_matrix(transformStamped.getRotation());
+  tf::Vector3 translation_vector(transformStamped.getOrigin().x(), transformStamped.getOrigin().y(), transformStamped.getOrigin().z());
+  transform_to_camera.setOrigin(translation_vector);
+  transform_to_camera.setRotation(transformStamped.getRotation());
+
+  tf::Transform transformed_matrix = transform_to_ros_coordinates*transform_to_camera;
+
+  
+
+  /*//tf::Transform map_to_odom_transform = transform_to_ros_coordinates*
+
+
+  Eigen::Matrix4d map_to_odom_transform_2;
+  Eigen::Affine3d map_to_odom_transform;
+  cv::cv2eigen(position_mat, map_to_odom_transform_2);
+  map_to_odom_transform.matrix() = map_to_odom_transform_2;
+
+  //std::cout << map_to_odom_transform_2 << '\n';
+ 
+  Eigen::Affine3d final_transform;
+
+  //Eigen::Affine3d OdomToCamera_transform_rotation;
+  Eigen::Affine3d OdomToCamera_transform;
+  //Eigen::Vector3d OdomToCamera_transform_translation;
+  //Eigen::Matrix4d OdomToCamera_transform;
+  //OdomToCamera_transform.setIdentity();
+  tf::Transform transform_to_camera;
+  //tf::Matrix3x3 rotation_matrix(transformStamped.getRotation());
+  tf::Vector3 translation_vector(transformStamped.getOrigin().x(), transformStamped.getOrigin().y(), transformStamped.getOrigin().z());
+  transform_to_camera.setOrigin(translation_vector);
+  transform_to_camera.setRotation(transformStamped.getRotation());
+   
+  tf::transformTFToEigen(transform_to_ros_coordinates*transform_to_camera, OdomToCamera_transform);
+  //tf::vectorTFToEigen(translation_vector, OdomToCamera_transform_translation);
+  //OdomToCamera_transform.block<3,3>(0,0) = OdomToCamera_transform_rotation.matrix();
+  //OdomToCamera_transform.rightCols<1>() = OdomToCamera_transform_translation;
+ 
+  final_transform = map_to_odom_transform*OdomToCamera_transform;
+  //Eigen::Affine3d final_transform_rotation = final_transform.block<3,3>(0,0);
+  //Eigen::Vector3d final_transform_translation = final_transform.rightCols<1>();
+
+  tf::StampedTransform transformed_matrix;
+  tf::transformEigenToTF(final_transform, transformed_matrix);
+  
+  // Checking End*/
+
+  /*
+  cv::Mat rotation(3,3,CV_32F);
+  cv::Mat translation(3,1,CV_32F);
   rotation = position_mat.rowRange(0,3).colRange(0,3);
   translation = position_mat.rowRange(0,3).col(3);
 
@@ -99,42 +194,11 @@ void Node::PublishRenderedImage (cv::Mat image) {
   tf_camera_rotation = tf_orb_to_ros*tf_camera_rotation;
   tf_camera_translation = tf_orb_to_ros*tf_camera_translation;
 
-  return tf::Transform (tf_camera_rotation, tf_camera_translation);
-} **/
-
-tf::Transform Node::TransformFromMat (cv::Mat position_mat) {
-  cv::Mat rotation(3,3,CV_32F);
-  cv::Mat translation(3,1,CV_32F);
-
-  rotation = position_mat.rowRange(0,3).colRange(0,3);
-  translation = position_mat.rowRange(0,3).col(3);
-
-  tf::Matrix3x3 tf_camera_rotation (rotation.at<float> (0,0), rotation.at<float> (0,1), rotation.at<float> (0,2),
-                                    rotation.at<float> (1,0), rotation.at<float> (1,1), rotation.at<float> (1,2),
-                                    rotation.at<float> (2,0), rotation.at<float> (2,1), rotation.at<float> (2,2)
-                                   );
-
-  tf::Vector3 tf_camera_translation (translation.at<float> (0), translation.at<float> (1), translation.at<float> (2));
-
-  //Coordinate transformation matrix : same as invYZ * Rz * Rx
-  const tf::Matrix3x3 matTrans (0, 0, 1,
-                               -1, 0, 0,
-                                0,-1, 0);
-                                
-  //Convert from orb_slam coordinates system to ros coordinates system
-  tf_camera_rotation = matTrans*tf_camera_rotation;
-  tf_camera_translation = matTrans*tf_camera_translation;
-
-  //Inverse matrix
-  tf_camera_rotation = tf_camera_rotation.transpose();
-  tf_camera_translation = -(tf_camera_rotation*tf_camera_translation);
-
-  //Convert from orb_slam coordinates system to ros coordinates system
-  tf_camera_rotation = matTrans*tf_camera_rotation;
-  tf_camera_translation = matTrans*tf_camera_translation;
-
-  return tf::Transform (tf_camera_rotation, tf_camera_translation);
+  return tf::Transform (tf_camera_rotation, tf_camera_translation);*/
+  
+  return transformed_matrix;
 }
+
 
 sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::MapPoint*> map_points) {
   if (map_points.size() == 0) {
