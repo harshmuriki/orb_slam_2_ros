@@ -1,0 +1,8 @@
+<launch>
+  <param name="/use_sim_time" value="true"/>
+  <node pkg="orb_slam2_ros" name="correct_tf" type="test.py" output="screen"/>
+  <!-- <node pkg="orb_slam2_ros" name="static_map" type="static_map.py" output="screen"/>  -->
+  <node pkg="orb_slam2_ros" name="update_scene_graph" type="update_scene_graph.py" output="screen"/> 
+  <!-- <node pkg="orb_slam2_ros" name="mapping_objects" type="mapping_objects.py" output="screen"/>  -->
+
+</launch>
