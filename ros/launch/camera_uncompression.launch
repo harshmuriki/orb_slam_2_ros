@@ -1,0 +1,16 @@
+<!-- rosrun image_transport republish compressed in:=/camera/color/image_raw raw out:=/test_image -->
+
+<launch>
+    <!-- Don't add the compressed parts to the topic names -->
+    <arg name="compressed_camera_topic" default="/camera/color/image_raw"/> 
+    <arg name="compressed_depth_topic" default="/camera/aligned_depth_to_color/image_raw"/>
+
+    <arg name="output_decompressed_camera_topic" default="/camera/color/image_raw/semantic_uncompressed"/>
+    <arg name="output_decompressed_depth_topic" default="/camera/aligned_depth_to_color/image_raw/semantic_uncompressed"/>
+
+    <node pkg="image_transport" type="republish" name="semantic_color_image_republish" output="screen"
+        args="compressed in:=$(arg compressed_camera_topic) raw out:=$(arg output_decompressed_camera_topic)" />
+
+    <node pkg="image_transport" type="republish" name="semantic_depth_image_republish" output="screen"
+        args="compressedDepth in:=$(arg compressed_depth_topic) raw out:=$(arg output_decompressed_depth_topic)" />
+</launch>

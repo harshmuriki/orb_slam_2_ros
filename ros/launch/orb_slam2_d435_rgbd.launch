@@ -1,12 +1,13 @@
 <launch>
   <node name="orb_slam2_rgbd" pkg="orb_slam2_ros"
       type="orb_slam2_ros_rgbd" output="screen">
-
-       <remap from="/camera/rgb/image_raw" to="/camera/color/image_rect_color" />
-       <remap from="/camera/depth_registered/image_raw" to="/camera/depth/image_rect_raw" />
+       <param name="/use_sim_time" value="true"/>
+       <remap from="/camera/rgb/image_raw" to="/camera/color/image_raw/semantic_uncompressed" />
+       <remap from="/camera/depth_registered/image_raw" to="/camera/aligned_depth_to_color/image_raw/semantic_uncompressed" />
 
        <param name="publish_pointcloud" type="bool" value="true" />
        <param name="publish_pose" type="bool" value="true" />
+       <param name="publish_tf" type="bool" value="true" />
        <param name="localize_only" type="bool" value="false" />
        <param name="reset_map" type="bool" value="false" />
 
@@ -16,42 +17,68 @@
        <param name="voc_file" type="string" value="$(find orb_slam2_ros)/orb_slam2/Vocabulary/ORBvoc.txt" />
 
        <param name="pointcloud_frame_id" type="string" value="map" />
-       <param name="camera_frame_id" type="string" value="camera_link" />
+       <param name="camera_frame_id" type="string" value="camera_color_optical_frame" />
+       <param name="target_frame_id" type="string" value="odom" />
        <param name="min_num_kf_in_map" type="int" value="5" />
 
        <!-- ORB parameters -->
        <param name="/ORBextractor/nFeatures" type="int" value="1000" />
        <param name="/ORBextractor/scaleFactor" type="double" value="1.2" />
-       <param name="/ORBextractor/nLevels" type="int" value="8" />
+       <param name="/ORBextractor/nLevels" type="int" value="10" />
        <param name="/ORBextractor/iniThFAST" type="int" value="20" />
        <param name="/ORBextractor/minThFAST" type="int" value="7" />
 
        <!-- Camera parameters -->
        <!-- Camera frames per second -->
-       <param name="camera_fps" type="int" value="30" />
+       <param name="camera_fps" type="int" value="60" />
        <!-- Color order of the images (0: BGR, 1: RGB. It is ignored if images are grayscale) -->
        <param name="camera_rgb_encoding" type="bool" value="true" />
        <!-- Close/Far threshold. Baseline times. -->
-       <param name="ThDepth" type="double" value="40.0" />
+       <param name="ThDepth" type="double" value="60.0" />
        <!-- Deptmap values factor (what pixel value in the depth image corresponds to 1m) -->
-       <param name="depth_map_factor" type="double" value="1.0" />
+       <param name="depth_map_factor" type="double" value="1000.0" />
 
         <!-- Camera calibration parameters -->
         <!--If the node should wait for a camera_info topic to take the camera calibration data-->
        <param name="load_calibration_from_cam" type="bool" value="false" />
+
+        <!-- Camera calibration and distortion parameters (640x480) -->
+      <param name="camera_fx" type="double" value="580.749799" />
+      <param name="camera_fy" type="double" value="576.329120" />
+      <param name="camera_cx" type="double" value="299.780758" />
+      <param name="camera_cy" type="double" value="246.058673"/>
+
+      <param name="camera_k1" type="double" value="0.1052479" />
+      <param name="camera_k2" type="double" value="-0.3356442" />
+      <param name="camera_p1" type="double" value="0.00716448" />
+      <param name="camera_p2" type="double" value="-0.01415372" />
+      <param name="camera_k3" type="double" value="0.0" />
+      <!-- IR projector baseline times fx (aprox.) -->
+      <param name="camera_baseline" type="double" value="-29.0375" />
+
        <!-- Camera calibration and distortion parameters (OpenCV) -->
-      <param name="camera_fx" type="double" value="615.6707153320312" />
-      <param name="camera_fy" type="double" value="615.962158203125" />
-      <param name="camera_cx" type="double" value="328.0010681152344" />
-      <param name="camera_cy" type="double" value="241.31031799316406" />
+      <!-- <param name="camera_fx" type="double" value="610.8463745117188" />
+      <param name="camera_fy" type="double" value="610.9038696289062" />
+      <param name="camera_cx" type="double" value="322.8827209472656" />
+      <param name="camera_cy" type="double" value="254.97903442382812" /> -->
+      
+      <!-- Camera params from bullet robot -->
+      <!-- <param name="camera_fx" type="double" value="905.608154296875" />
+      <param name="camera_fy" type="double" value="903.4915771484375" />
+      <param name="camera_cx" type="double" value="644.8792114257812" />
+      <param name="camera_cy" type="double" value="361.4921569824219" /> -->
+
        <!-- Camera calibration and distortion parameters (OpenCV) -->
-      <param name="camera_k1" type="double" value="0.0" />
+      <!-- <param name="camera_k1" type="double" value="0.0" />
       <param name="camera_k2" type="double" value="0.0" />
       <param name="camera_p1" type="double" value="0.0" />
       <param name="camera_p2" type="double" value="0.0" />
-      <param name="camera_k3" type="double" value="0.0" />
+      <param name="camera_k3" type="double" value="0.0" /> -->
       <!-- IR projector baseline times fx (aprox.) -->
-      <param name="camera_baseline" type="double" value="9.052" />
+      <!-- <param name="camera_baseline" type="double" value="30.54" /> -->
 
   </node>
+  
+  <!-- Running camera decompression file -->
+  <include file="$(find orb_slam2_ros)/ros/launch/camera_uncompression.launch" />
 </launch>
